@@ -419,6 +419,8 @@ int main(int argc, char **argv)
     }
 #endif
 
+
+// darknet支持的参数 
     if (0 == strcmp(argv[1], "average")){
         average(argc, argv);
     } else if (0 == strcmp(argv[1], "yolo")){
