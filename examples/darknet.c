@@ -402,15 +402,20 @@ int main(int argc, char **argv)
     //test_resize("data/bad.jpg");
     //test_box();
     //test_convolutional_layer();
+
+    // 没有命令行参数时，标准错误输出 "usage: darknet <function>"
     if(argc < 2){
         fprintf(stderr, "usage: %s <function>\n", argv[0]);
         return 0;
     }
+    // 是否使用gpu，若没设置则默认为 0，即第一个GPU 
     gpu_index = find_int_arg(argc, argv, "-i", 0);
     if(find_arg(argc, argv, "-nogpu")) {
         gpu_index = -1;
     }
 
+// 若没有定义GPU，则gpu_index = -1，即不使用gpu
+// 若定义GPU，则令cuda使用gpu_index指定的gpu
 #ifndef GPU
     gpu_index = -1;
 #else
@@ -486,7 +491,7 @@ int main(int argc, char **argv)
     } else if (0 == strcmp(argv[1], "oneoff2")){
         oneoff2(argv[2], argv[3], argv[4], atoi(argv[5]));
     } else if (0 == strcmp(argv[1], "print")){
-        print_weights(argv[2], argv[3], atoi(argv[4]));
+        print_weights(argv[2], argv[3], atoi(argv[4])); 
     } else if (0 == strcmp(argv[1], "partial")){
         partial(argv[2], argv[3], argv[4], atoi(argv[5]));
     } else if (0 == strcmp(argv[1], "average")){

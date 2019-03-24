@@ -788,21 +788,26 @@ void network_detect(network *net, image im, float thresh, float hier_thresh, flo
 
 void run_detector(int argc, char **argv)
 {
+    // 定义一些变量和指针，若出现对应参数则赋予其指定的值，否则赋默认值
     char *prefix = find_char_arg(argc, argv, "-prefix", 0);
     float thresh = find_float_arg(argc, argv, "-thresh", .5);
     float hier_thresh = find_float_arg(argc, argv, "-hier", .5);
     int cam_index = find_int_arg(argc, argv, "-c", 0);
     int frame_skip = find_int_arg(argc, argv, "-s", 0);
     int avg = find_int_arg(argc, argv, "-avg", 3);
+    // 如果参数数量小于4，标准错误输出""usage: darknet detector [train/test/valid] [cfg] [weights (optional)]"
     if(argc < 4){
         fprintf(stderr, "usage: %s %s [train/test/valid] [cfg] [weights (optional)]\n", argv[0], argv[1]);
         return;
     }
+    
+    // 检查是否指定GPU运算，gpus_list表示所有列出的gpu，gpus应该用','隔开
     char *gpu_list = find_char_arg(argc, argv, "-gpus", 0);
     char *outfile = find_char_arg(argc, argv, "-out", 0);
     int *gpus = 0;
     int gpu = 0;
-    int ngpus = 0;
+    int ngpus = 0;	// numberOfgpus
+      // 如果gpu_list不为null，即列出了gpus，将输出列出的gpus，并将其由char转为int
     if(gpu_list){
         printf("%s\n", gpu_list);
         int len = strlen(gpu_list);
