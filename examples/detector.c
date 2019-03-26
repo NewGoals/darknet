@@ -559,6 +559,7 @@ void validate_detector_recall(char *cfgfile, char *weightfile)
 }
 
 
+// 测试检测器
 void test_detector(char *datacfg, char *cfgfile, char *weightfile, char *filename, float thresh, float hier_thresh, char *outfile, int fullscreen)
 {
     list *options = read_data_cfg(datacfg);
@@ -789,6 +790,7 @@ void network_detect(network *net, image im, float thresh, float hier_thresh, flo
 void run_detector(int argc, char **argv)
 {
     // 定义一些变量和指针，若出现对应参数则赋予其指定的值，否则赋默认值
+    // 示例 ./darknet detector test cfg/voc.data cfg/tiny-yolo-voc.cfg results/tiny-yolo-voc_6000.weights data/images.jpg
     char *prefix = find_char_arg(argc, argv, "-prefix", 0);
     float thresh = find_float_arg(argc, argv, "-thresh", .5);
     float hier_thresh = find_float_arg(argc, argv, "-hier", .5);
@@ -807,7 +809,7 @@ void run_detector(int argc, char **argv)
     int *gpus = 0;
     int gpu = 0;
     int ngpus = 0;	// numberOfgpus
-      // 如果gpu_list不为null，即列出了gpus，将输出列出的gpus，并将其由char转为int
+    // 如果gpu_list不为null，将输入的gpus_list由char转为int，存到数组gpus中
     if(gpu_list){
         printf("%s\n", gpu_list);
         int len = strlen(gpu_list);
@@ -821,7 +823,7 @@ void run_detector(int argc, char **argv)
             gpus[i] = atoi(gpu_list);
             gpu_list = strchr(gpu_list, ',')+1;
         }
-    } else {
+    } else {	// 若gpu_list为null，gpus为gpu_index中的值
         gpu = gpu_index;
         gpus = &gpu;
         ngpus = 1;
@@ -834,9 +836,13 @@ void run_detector(int argc, char **argv)
     int fps = find_int_arg(argc, argv, "-fps", 0);
     //int class = find_int_arg(argc, argv, "-class", 0);
 
+    // 第四个参数应为数据配置文件，将其存入字符串datacfg，其存储位置在cfg中，以.data为后缀
     char *datacfg = argv[3];
+    // 第五个参数应为配置文件，即所选模型的配置，其存储位置在cfg中，以.cfg为后缀
     char *cfg = argv[4];
+    // 若参数数量大于5，则第六个参数为权重weight，否则weight为null
     char *weights = (argc > 5) ? argv[5] : 0;
+    // 若参数数量大于6，则第七个参数为文件名，否则filename指向null
     char *filename = (argc > 6) ? argv[6]: 0;
     if(0==strcmp(argv[2], "test")) test_detector(datacfg, cfg, weights, filename, thresh, hier_thresh, outfile, fullscreen);
     else if(0==strcmp(argv[2], "train")) train_detector(datacfg, cfg, weights, gpus, ngpus, clear);
