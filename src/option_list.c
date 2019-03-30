@@ -4,6 +4,7 @@
 #include "option_list.h"
 #include "utils.h"
 
+// read file, strip each line into key&value and save in options
 list *read_data_cfg(char *filename)
 {
     FILE *file = fopen(filename, "r");
@@ -49,6 +50,7 @@ metadata get_metadata(char *file)
     return m;
 }
 
+// strip string s into key&value and then insert them into options
 int read_option(char *s, list *options)
 {
     size_t i;
@@ -67,6 +69,8 @@ int read_option(char *s, list *options)
     return 1;
 }
 
+// insert a node which sturct contains key&value into list
+// from this func we can see 'kvp->node->list'
 void option_insert(list *l, char *key, char *val)
 {
     kvp *p = malloc(sizeof(kvp));
@@ -88,6 +92,7 @@ void option_unused(list *l)
     }
 }
 
+// 从options中找到key对应的val并返回其对应的val，若不存在则返回0
 char *option_find(list *l, char *key)
 {
     node *n = l->front;
@@ -101,6 +106,8 @@ char *option_find(list *l, char *key)
     }
     return 0;
 }
+
+// 从options中找到一个key并返回其对应的val，若不存在则返回def
 char *option_find_str(list *l, char *key, char *def)
 {
     char *v = option_find(l, key);

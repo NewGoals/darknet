@@ -9,6 +9,8 @@
 
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 
+
+// 将filename中的每一行存入lines中，并返回一个line链表
 list *get_paths(char *filename)
 {
     char *path;
@@ -654,6 +656,8 @@ matrix load_tags_paths(char **paths, int n, int k)
     return y;
 }
 
+
+// 将filename中的每一行转化为字符数组的形式由labels存储
 char **get_labels(char *filename)
 {
     list *plist = get_paths(filename);

@@ -50,6 +50,7 @@ load_args get_base_args(network *net)
     return args;
 }
 
+// 加载指定为cfg的network，权重为weights
 network *load_network(char *cfg, char *weights, int clear)
 {
     network *net = parse_network_cfg(cfg);
@@ -336,6 +337,7 @@ void set_temp_network(network *net, float t)
 }
 
 
+// 将network的batch设为b
 void set_batch_network(network *net, int b)
 {
     net->batch = b;

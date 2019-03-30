@@ -220,6 +220,8 @@ void draw_bbox(image a, box bbox, int w, float r, float g, float b)
     }
 }
 
+// 加载alphabet字符表，以image格式存储
+// 加载图片是用3channel，并且不改变大小
 image **load_alphabet()
 {
     int i, j;
@@ -809,6 +811,10 @@ void letterbox_image_into(image im, int w, int h, image boxed)
     free_image(resized);
 }
 
+
+// 使得im的宽高比和指定的宽高相同，并且为im宽高与指定的宽高比中较小的
+// resized为重新调整后的im的图像
+// 返回的为im 与 boxed合并后的图像
 image letterbox_image(image im, int w, int h)
 {
     int new_w = im.w;

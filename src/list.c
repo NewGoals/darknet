@@ -37,6 +37,7 @@ void *list_pop(list *l){
     return val;
 }
 
+// 向list中添加一个value为val的节点
 void list_insert(list *l, void *val)
 {
 	node *new = malloc(sizeof(node));
@@ -79,6 +80,7 @@ void free_list_contents(list *l)
 	}
 }
 
+// 将list转化为字符数组
 void **list_to_array(list *l)
 {
     void **a = calloc(l->size, sizeof(void*));

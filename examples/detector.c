@@ -3,8 +3,10 @@
 static int coco_ids[] = {1,2,3,4,5,6,7,8,9,10,11,13,14,15,16,17,18,19,20,21,22,23,24,25,27,28,31,32,33,34,35,36,37,38,39,40,41,42,43,44,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63,64,65,67,70,72,73,74,75,76,77,78,79,80,81,82,84,85,86,87,88,89,90};
 
 
+// 训练detector
 void train_detector(char *datacfg, char *cfgfile, char *weightfile, int *gpus, int ngpus, int clear)
 {
+    //将datacfg中的数据由key&val形式存入options中
     list *options = read_data_cfg(datacfg);
     char *train_images = option_find_str(options, "train", "data/train.list");
     char *backup_directory = option_find_str(options, "backup", "/backup/");
@@ -559,13 +561,19 @@ void validate_detector_recall(char *cfgfile, char *weightfile)
 }
 
 
-// 测试检测器
+// 测试detector
+// 根据输入的数据配置datacfg，模型配置cfgfile，权重weightfile，测试文件路径filename来输出预测结果
 void test_detector(char *datacfg, char *cfgfile, char *weightfile, char *filename, float thresh, float hier_thresh, char *outfile, int fullscreen)
 {
+	// 向options中存入datacfg中存放的key & val
     list *options = read_data_cfg(datacfg);
-    char *name_list = option_find_str(options, "names", "data/names.list");
+	// 向name_list中存入key为names对应的val值，若不存在，则val为data/names.list
+   	// name_list实际上是一个包含各种类名的文件 
+    char *name_list = option_find_str(options, "names", "data/names.list");    	
+    	// 将name_list中的每一个类名由names作为字符数组存储
     char **names = get_labels(name_list);
 
+    	// 加载字符表
     image **alphabet = load_alphabet();
     network *net = load_network(cfgfile, weightfile, 0);
     set_batch_network(net, 1);
@@ -575,6 +583,8 @@ void test_detector(char *datacfg, char *cfgfile, char *weightfile, char *filenam
     char *input = buff;
     float nms=.45;
     while(1){
+	// 若filename存在，将其复制到input中
+	// 若不存在，将键入的路径存入input中 
         if(filename){
             strncpy(input, filename, 256);
         } else {
@@ -584,7 +594,9 @@ void test_detector(char *datacfg, char *cfgfile, char *weightfile, char *filenam
             if(!input) return;
             strtok(input, "\n");
         }
+	// 载入input位置的图片，即需要检测的图片
         image im = load_image_color(input,0,0);
+	// 将im嵌入规定大小的box中
         image sized = letterbox_image(im, net->w, net->h);
         //image sized = resize_image(im, net->w, net->h);
         //image sized2 = resize_max(im, net->w);
