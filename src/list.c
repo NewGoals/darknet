@@ -80,7 +80,7 @@ void free_list_contents(list *l)
 	}
 }
 
-// 将list转化为字符数组
+// 将list转化为未指明类型的数组，使用该函数需强制转换类型
 void **list_to_array(list *l)
 {
     void **a = calloc(l->size, sizeof(void*));

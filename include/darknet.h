@@ -544,6 +544,7 @@ typedef enum {
     CLASSIFICATION_DATA, DETECTION_DATA, CAPTCHA_DATA, REGION_DATA, IMAGE_DATA, COMPARE_DATA, WRITING_DATA, SWAG_DATA, TAG_DATA, OLD_CLASSIFICATION_DATA, STUDY_DATA, DET_DATA, SUPER_DATA, LETTERBOX_DATA, REGRESSION_DATA, SEGMENTATION_DATA, INSTANCE_DATA, ISEG_DATA
 } data_type;
 
+// 包含要读入图片数据的信息（读入多少张，开几个线程读入，读入图片最终的宽高，图片路径等等）
 typedef struct load_args{
     int threads;
     char **paths;

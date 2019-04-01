@@ -6,15 +6,19 @@ static int coco_ids[] = {1,2,3,4,5,6,7,8,9,10,11,13,14,15,16,17,18,19,20,21,22,2
 // 训练detector
 void train_detector(char *datacfg, char *cfgfile, char *weightfile, int *gpus, int ngpus, int clear)
 {
-    //将datacfg中的数据由key&val形式存入options中
+    // 将datacfg中的数据由key&val形式存入options中
     list *options = read_data_cfg(datacfg);
+    // 将训练数据的路径传入train_images，该路径内容每一行都是一个训练图片的地址
     char *train_images = option_find_str(options, "train", "data/train.list");
+    // 将backup_directory作为备份目录
     char *backup_directory = option_find_str(options, "backup", "/backup/");
 
     srand(time(0));
+    // 获取模型名称，如yolov3
     char *base = basecfg(cfgfile);
     printf("%s\n", base);
     float avg_loss = -1;
+    // 根据gpu数给每个gpu分配一个神经网络(net)来同时训练
     network **nets = calloc(ngpus, sizeof(network));
 
     srand(time(0));
@@ -25,13 +29,17 @@ void train_detector(char *datacfg, char *cfgfile, char *weightfile, int *gpus, i
 #ifdef GPU
         cuda_set_device(gpus[i]);
 #endif
-        nets[i] = load_network(cfgfile, weightfile, clear);
-        nets[i]->learning_rate *= ngpus;
+        // 对每个网络解析网络配置文件，初始化网络，并加载预训练权重
+	nets[i] = load_network(cfgfile, weightfile, clear);
+        // net的训练速率为定义的learning_rate的ngpus倍
+	nets[i]->learning_rate *= ngpus;
     }
     srand(time(0));
     network *net = nets[0];
 
+    // 同时训练的图片数,net->batch * net->subdivisions即为模型cfg中设置的batch，这里表示的是每个batch中由多少图片
     int imgs = net->batch * net->subdivisions * ngpus;
+    // 输出梯度下降相关参数
     printf("Learning Rate: %g, Momentum: %g, Decay: %g\n", net->learning_rate, net->momentum, net->decay);
     data train, buffer;
 
@@ -40,8 +48,11 @@ void train_detector(char *datacfg, char *cfgfile, char *weightfile, int *gpus, i
     int classes = l.classes;
     float jitter = l.jitter;
 
+    // 将所有图片的路径存入list类型的plist中:
     list *plist = get_paths(train_images);
     //int N = plist->size;
+    
+    // 将plist转化为字符数组存入paths中，paths[0],paths[1]...均为图片路径
     char **paths = (char **)list_to_array(plist);
 
     load_args args = get_base_args(net);
@@ -565,18 +576,21 @@ void validate_detector_recall(char *cfgfile, char *weightfile)
 // 根据输入的数据配置datacfg，模型配置cfgfile，权重weightfile，测试文件路径filename来输出预测结果
 void test_detector(char *datacfg, char *cfgfile, char *weightfile, char *filename, float thresh, float hier_thresh, char *outfile, int fullscreen)
 {
-	// 向options中存入datacfg中存放的key & val
+    // 向options中存入datacfg中存放的key & val
     list *options = read_data_cfg(datacfg);
-	// 向name_list中存入key为names对应的val值，若不存在，则val为data/names.list
-   	// name_list实际上是一个包含各种类名的文件 
+    // 向name_list中存入key为names对应的val值，若不存在，则val为data/names.list
+    // name_list实际上是一个包含各种类名的文件 
     char *name_list = option_find_str(options, "names", "data/names.list");    	
-    	// 将name_list中的每一个类名由names作为字符数组存储
+    // 将name_list中的每一个类名由names作为字符数组存储
     char **names = get_labels(name_list);
 
-    	// 加载字符表
+    // 加载字符表
     image **alphabet = load_alphabet();
+    // 利用network结构体存储模型配置，并载入其训练得到的权重weightfile
     network *net = load_network(cfgfile, weightfile, 0);
+    // 将batch设为1，表示一张张检测图片
     set_batch_network(net, 1);
+    // 设置随机数种子
     srand(2222222);
     double time;
     char buff[256];
@@ -596,7 +610,7 @@ void test_detector(char *datacfg, char *cfgfile, char *weightfile, char *filenam
         }
 	// 载入input位置的图片，即需要检测的图片
         image im = load_image_color(input,0,0);
-	// 将im嵌入规定大小的box中
+	// 将im嵌入规定大小的box中，调整图片的大小
         image sized = letterbox_image(im, net->w, net->h);
         //image sized = resize_image(im, net->w, net->h);
         //image sized2 = resize_max(im, net->w);
@@ -614,9 +628,11 @@ void test_detector(char *datacfg, char *cfgfile, char *weightfile, char *filenam
         //printf("%d\n", nboxes);
         //if (nms) do_nms_obj(boxes, probs, l.w*l.h*l.n, l.classes, nms);
         if (nms) do_nms_sort(dets, nboxes, l.classes, nms);
+	// 画预测结果
         draw_detections(im, dets, nboxes, thresh, names, alphabet, l.classes);
         free_detections(dets, nboxes);
         if(outfile){
+	    // 保存标记了预测标签的图片，若未指定名称，则保存为predictions
             save_image(im, outfile);
         }
         else{
@@ -841,6 +857,7 @@ void run_detector(int argc, char **argv)
         ngpus = 1;
     }
 
+    // 检测是否由clear参数,有则设置clear为1，否则为0
     int clear = find_arg(argc, argv, "-clear");
     int fullscreen = find_arg(argc, argv, "-fullscreen");
     int width = find_int_arg(argc, argv, "-w", 0);

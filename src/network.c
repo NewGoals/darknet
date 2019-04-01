@@ -50,7 +50,11 @@ load_args get_base_args(network *net)
     return args;
 }
 
-// 加载指定为cfg的network，权重为weights
+/*
+** 对网络(net)解析网络配置文件cfg，权重为weights
+** net->seen 表示从训练器开始运行到当前时刻已经训练的图像张数. 最终保存模型时的迭代次数就是根据 net->seen 计算得到的.
+** 如果使用之前已经训练过的模型做微调, 但又不想使用之前模型中保存下的 seen 变量值, 可以在训练命令行使用 “-clear” 参数
+*/
 network *load_network(char *cfg, char *weights, int clear)
 {
     network *net = parse_network_cfg(cfg);
@@ -61,6 +65,10 @@ network *load_network(char *cfg, char *weights, int clear)
     return net;
 }
 
+/*
+** 计算当前已经读入多少个batch（提醒一下：网络配置.cfg文件中的batch不是指总共有多少个batch，而是指每个batch中有多少张图片，
+** tensorflow实战中一般用batch_size来表示一个batch中函数的图片张数，用num_batches来表示共有多少个batch，这样更加清晰）
+*/
 size_t get_current_batch(network *net)
 {
     size_t batch_num = (*net->seen)/(net->batch*net->subdivisions);
