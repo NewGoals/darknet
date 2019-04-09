@@ -35,14 +35,16 @@ void train_detector(char *datacfg, char *cfgfile, char *weightfile, int *gpus, i
 	nets[i]->learning_rate *= ngpus;
     }
     srand(time(0));
+    // net指向第一个网络，net取第几个网络无所谓，只是用来设置一些参数
     network *net = nets[0];
 
-    // 同时训练的图片数,net->batch * net->subdivisions即为模型cfg中设置的batch，这里表示的是每个batch中由多少图片
+    // 同时训练的图片数,net->batch * net->subdivisions即为模型cfg中设置的batch，这里表示的是每个batch中有多少图片
     int imgs = net->batch * net->subdivisions * ngpus;
     // 输出梯度下降相关参数
     printf("Learning Rate: %g, Momentum: %g, Decay: %g\n", net->learning_rate, net->momentum, net->decay);
     data train, buffer;
 
+    // 将l设为网络的最后一层，其中net->n代表网络的层数，如[yolo]等
     layer l = net->layers[net->n - 1];
 
     int classes = l.classes;
@@ -55,34 +57,39 @@ void train_detector(char *datacfg, char *cfgfile, char *weightfile, int *gpus, i
     // 将plist转化为字符数组存入paths中，paths[0],paths[1]...均为图片路径
     char **paths = (char **)list_to_array(plist);
 
+    // 关于训练图片一些参数设置
     load_args args = get_base_args(net);
     args.coords = l.coords;
     args.paths = paths;
-    args.n = imgs;
-    args.m = plist->size;
+    args.n = imgs;		// 一次加载的图片数量
+    args.m = plist->size;	// 加载图片的总数量
     args.classes = classes;
     args.jitter = jitter;
     args.num_boxes = l.max_boxes;
-    args.d = &buffer;
+    args.d = &buffer;		//arg.d指向buffer的地址，缓存图片数据
     args.type = DETECTION_DATA;
     //args.type = INSTANCE_DATA;
     args.threads = 64;
 
+    // 由load_threads开辟多线程读取图片数据存储到args.d中，load_thread是load_threads函数运行的线程id 
     pthread_t load_thread = load_data(args);
     double time;
     int count = 0;
     //while(i*imgs < N*120){
+
+    // 网络当前读入的batch数小于网络允许的最大batch数
     while(get_current_batch(net) < net->max_batches){
+	// 根据l.random决定是否多尺度,如果要的话每训练10个batch进行一下下面的操作，泛化数据
         if(l.random && count++%10 == 0){
             printf("Resizing\n");
-            int dim = (rand() % 10 + 10) * 32;
+            int dim = (rand() % 10 + 10) * 32;	// 将dim设置为320-608间32的倍数 
             if (get_current_batch(net)+200 > net->max_batches) dim = 608;
             //int dim = (rand() % 4 + 16) * 32;
             printf("%d\n", dim);
             args.w = dim;
             args.h = dim;
 
-            pthread_join(load_thread, 0);
+	    pthread_join(load_thread, 0);	// 等待线程结束，不存储返回值
             train = buffer;
             free_data(train);
             load_thread = load_data(args);
@@ -94,9 +101,9 @@ void train_detector(char *datacfg, char *cfgfile, char *weightfile, int *gpus, i
             net = nets[0];
         }
         time=what_time_is_it_now();
-        pthread_join(load_thread, 0);
-        train = buffer;
-        load_thread = load_data(args);
+        pthread_join(load_thread, 0);		// 等待线程结束，即一个batch的图片全部加载到args.d中
+        train = buffer;				// 将buffer中缓存的图片信息复制给train(一个batch的图片信息)
+        load_thread = load_data(args);		// 多线程读取数据，每次读取一个batch_size的图片
 
         /*
            int k;
@@ -127,27 +134,30 @@ void train_detector(char *datacfg, char *cfgfile, char *weightfile, int *gpus, i
         time=what_time_is_it_now();
         float loss = 0;
 #ifdef GPU
+	// 若存在GPU且gpu数量为１，则使用一个gpu训练，否则按gpu数量批量训练网络
         if(ngpus == 1){
             loss = train_network(net, train);
         } else {
             loss = train_networks(nets, ngpus, train, 4);
         }
 #else
-        loss = train_network(net, train);
+        loss = train_network(net, train);	// 计算一张图片的平均损失值
 #endif
-        if (avg_loss < 0) avg_loss = loss;
-        avg_loss = avg_loss*.9 + loss*.1;
+        if (avg_loss < 0) avg_loss = loss;	// 前面定义avg_loss=-1，即初次训练时，直接对avg_loss赋值
+        avg_loss = avg_loss*.9 + loss*.1;	// 按权重对avg_loss赋值
 
-        i = get_current_batch(net);
+        i = get_current_batch(net);		// 获取当前已经训练的batch_size数
         printf("%ld: %f, %f avg, %f rate, %lf seconds, %d images\n", get_current_batch(net), loss, avg_loss, get_current_rate(net), what_time_is_it_now()-time, i*imgs);
-        if(i%100==0){
+        // 每100个batch更新一次weights到backup/*.backup中
+	if(i%100==0){
 #ifdef GPU
             if(ngpus != 1) sync_nets(nets, ngpus, 0);
 #endif
             char buff[256];
-            sprintf(buff, "%s/%s.backup", backup_directory, base);
+            sprintf(buff, "%s/%s.backup", backup_directory, base);	// buff存储备份文件路径，如backup/yolov3.backup
             save_weights(net, buff);
         }
+	// 前1000个batch_size时，每100个batch都会存储，1000以后每10000个batch存储到backup/*_i.weights，表示训练i个batch后的weights
         if(i%10000==0 || (i < 1000 && i%100 == 0)){
 #ifdef GPU
             if(ngpus != 1) sync_nets(nets, ngpus, 0);
@@ -162,7 +172,7 @@ void train_detector(char *datacfg, char *cfgfile, char *weightfile, int *gpus, i
     if(ngpus != 1) sync_nets(nets, ngpus, 0);
 #endif
     char buff[256];
-    sprintf(buff, "%s/%s_final.weights", backup_directory, base);
+    sprintf(buff, "%s/%s_final.weights", backup_directory, base);	// 将最终的weights存到backup/*_final.weights中
     save_weights(net, buff);
 }
 

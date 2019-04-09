@@ -44,6 +44,7 @@ void list_insert(list *l, void *val)
 	new->val = val;
 	new->next = 0;
 
+	// 若l->back为0，即l中不含任何节点，那么让new作为头结点，否则让new接在l的尾部
 	if(!l->back){
 		l->front = new;
 		new->prev = 0;

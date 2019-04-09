@@ -652,6 +652,7 @@ learning_rate_policy get_policy(char *s)
     return CONSTANT;
 }
 
+// 将通用网络参数读取到网络结构中
 void parse_net_options(list *options, network *net)
 {
     net->batch = option_find_int(options, "batch",1);
@@ -661,6 +662,7 @@ void parse_net_options(list *options, network *net)
     int subdivs = option_find_int(options, "subdivisions",1);
     net->time_steps = option_find_int_quiet(options, "time_steps",1);
     net->notruth = option_find_int_quiet(options, "notruth",0);
+    // 将配置文件中的batch大小分成subdivisions份，一份即net->batch 
     net->batch /= subdivs;
     net->batch *= net->time_steps;
     net->subdivisions = subdivs;
@@ -676,6 +678,7 @@ void parse_net_options(list *options, network *net)
     net->h = option_find_int_quiet(options, "height",0);
     net->w = option_find_int_quiet(options, "width",0);
     net->c = option_find_int_quiet(options, "channels",0);
+    // 一张输入图片的元素个数，如果网络配置文件没有指定，则默认值为net->h * net->w * net->c
     net->inputs = option_find_int_quiet(options, "inputs", net->h * net->w * net->c);
     net->max_crop = option_find_int_quiet(options, "max_crop",net->w*2);
     net->min_crop = option_find_int_quiet(options, "min_crop",net->w);
@@ -733,36 +736,40 @@ void parse_net_options(list *options, network *net)
     net->max_batches = option_find_int(options, "max_batches", 0);
 }
 
+// 判断s的类型是否为net or network
 int is_network(section *s)
 {
     return (strcmp(s->type, "[net]")==0
             || strcmp(s->type, "[network]")==0);
 }
 
+// 根据网络配置文件来解析网络结构
 network *parse_network_cfg(char *filename)
 {
-    list *sections = read_cfg(filename);
+    list *sections = read_cfg(filename);		// sections的每个node包含一层神经网络的所有结构参数
+    // 获取sections的第一个节点[net]，net并不是某一层神经网络的参数
+    // net是整个网络的一些通用参数，如学习率(learning_rate)，衰减率(decay)，输入图像宽高，batch大小等
     node *n = sections->front;
     if(!n) error("Config file has no sections");
-    network *net = make_network(sections->size - 1);
-    net->gpu_index = gpu_index;
-    size_params params;
+    network *net = make_network(sections->size - 1);	// 创建网络结构并分配动态内存，网络层数为sections->size -1
+    net->gpu_index = gpu_index;				// 使用用户设置的gpu
+    size_params params;					// 每一层神经网络使用的临时网络尺寸参数
 
-    section *s = (section *)n->val;
-    list *options = s->options;
+    section *s = (section *)n->val;			// 将[net]的参数以section类型传给s
+    list *options = s->options;				// 将网络通用参数(键值对类型)传给options
     if(!is_network(s)) error("First section must be [net] or [network]");
-    parse_net_options(options, net);
+    parse_net_options(options, net);			//　解析网络通用参数
 
     params.h = net->h;
     params.w = net->w;
     params.c = net->c;
-    params.inputs = net->inputs;
+    params.inputs = net->inputs;			// 输入图片元素(像素)个数，默认为w*h*c
     params.batch = net->batch;
     params.time_steps = net->time_steps;
     params.net = net;
 
     size_t workspace_size = 0;
-    n = n->next;
+    n = n->next;	// n指向第一层神经网络
     int count = 0;
     free_section(s);
     fprintf(stderr, "layer     filters    size              input                output\n");
@@ -771,8 +778,8 @@ network *parse_network_cfg(char *filename)
         fprintf(stderr, "%5d ", count);
         s = (section *)n->val;
         options = s->options;
-        layer l = {0};
-        LAYER_TYPE lt = string_to_layer_type(s->type);
+        layer l = {0};	// 定义网络层
+        LAYER_TYPE lt = string_to_layer_type(s->type);	// 获取网络层的类别
         if(lt == CONVOLUTIONAL){
             l = parse_convolutional(options, params);
         }else if(lt == DECONVOLUTIONAL){
@@ -847,13 +854,14 @@ network *parse_network_cfg(char *filename)
         l.dontloadscales = option_find_int_quiet(options, "dontloadscales", 0);
         l.learning_rate_scale = option_find_float_quiet(options, "learning_rate", 1);
         l.smooth = option_find_float_quiet(options, "smooth", 0);
-        option_unused(options);
-        net->layers[count] = l;
+        option_unused(options);		// 列出未使用的参数
+        net->layers[count] = l;		// 将该layer l作为net的第i层网络
         if (l.workspace_size > workspace_size) workspace_size = l.workspace_size;
         free_section(s);
-        n = n->next;
+        n = n->next;			// n指向下一层神经网络参数
         ++count;
-        if(n){
+        // 将该层的神经网络输出尺寸参数传递给下一层神经网络
+	if(n){
             params.h = l.out_h;
             params.w = l.out_w;
             params.c = l.out_c;
@@ -861,13 +869,13 @@ network *parse_network_cfg(char *filename)
         }
     }
     free_list(sections);
-    layer out = get_network_output_layer(net);
-    net->outputs = out.outputs;
-    net->truths = out.outputs;
+    layer out = get_network_output_layer(net);	// 获取最后一层网络
+    net->outputs = out.outputs;			//*outputs可能为label的数量，那么net->outputs代表可识别物体有多少种
+    net->truths = out.outputs;			//*若上述猜想正确，net->truth表示真值表长度
     if(net->layers[net->n-1].truths) net->truths = net->layers[net->n-1].truths;
-    net->output = out.output;
-    net->input = calloc(net->inputs*net->batch, sizeof(float));
-    net->truth = calloc(net->truths*net->batch, sizeof(float));
+    net->output = out.output;			//*output为最后一层神经网络的输出的真值表，该输出同时也是网络的输入
+    net->input = calloc(net->inputs*net->batch, sizeof(float));		// 为网络载入图片申请内存
+    net->truth = calloc(net->truths*net->batch, sizeof(float));		// 为网络载入真值表申请内存
 #ifdef GPU
     net->output_gpu = out.output_gpu;
     net->input_gpu = cuda_make_array(net->input, net->inputs*net->batch);
@@ -888,6 +896,7 @@ network *parse_network_cfg(char *filename)
     return net;
 }
 
+// 读取配置文件信息，得到的信息以list的方式存储
 list *read_cfg(char *filename)
 {
     FILE *file = fopen(filename, "r");
@@ -895,16 +904,16 @@ list *read_cfg(char *filename)
     char *line;
     int nu = 0;
     list *options = make_list();
-    section *current = 0;
+    section *current = 0;	// 先另section指向null
     while((line=fgetl(file)) != 0){
         ++ nu;
-        strip(line);
+        strip(line);		// 去除句子句子的空格，\n,\t
         switch(line[0]){
             case '[':
                 current = malloc(sizeof(section));
-                list_insert(options, current);
-                current->options = make_list();
-                current->type = line;
+                list_insert(options, current);		// 将current以node的形式插入到options中
+                current->options = make_list();		// 将current中list类型的options初始化
+                current->type = line;			// current中的类型为[net],[convolutional]等类型
                 break;
             case '\0':
             case '#':
@@ -912,6 +921,8 @@ list *read_cfg(char *filename)
                 free(line);
                 break;
             default:
+		// 每次初始化都会使得current->options重置，将每个type类型后面的键值对存入不同的current->options中，
+		// 并以current->type标注类型，最后将所有的current以node的形式存入一个list中，并返回
                 if(!read_option(line, current->options)){
                     fprintf(stderr, "Config file error line %d, could parse: %s\n", nu, line);
                     free(line);

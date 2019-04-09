@@ -408,14 +408,14 @@ int main(int argc, char **argv)
         fprintf(stderr, "usage: %s <function>\n", argv[0]);
         return 0;
     }
-    // 是否使用gpu，若没设置则默认为 0，即第一个GPU 
+    // 指定使用第几个gpu，若没设置则默认为 0，即第一个GPU 
     gpu_index = find_int_arg(argc, argv, "-i", 0);
     if(find_arg(argc, argv, "-nogpu")) {
         gpu_index = -1;
     }
 
-// 若没有定义GPU，则gpu_index = -1，即不使用gpu
-// 若定义GPU，则令cuda使用gpu_index指定的gpu
+    // 若使用gpu，则gpu_index = -1，即不使用gpu
+    // 若不使用gpu，则令cuda使用gpu_index指定的gpu
 #ifndef GPU
     gpu_index = -1;
 #else

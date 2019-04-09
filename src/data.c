@@ -41,6 +41,7 @@ char **get_random_paths_indexes(char **paths, int n, int m, int *indexes)
 }
 */
 
+// 在前m个路径中，随机选取n个路径并返回
 char **get_random_paths(char **paths, int n, int m)
 {
     char **random_paths = calloc(n, sizeof(char*));
@@ -88,6 +89,7 @@ matrix load_image_paths_gray(char **paths, int n, int w, int h)
     return X;
 }
 
+// 按照规定w,h将paths路径上的图片(彩色)加载到矩阵中，矩阵中的每一行都是一张图片的所有数据
 matrix load_image_paths(char **paths, int n, int w, int h)
 {
     int i;
@@ -542,18 +544,26 @@ data load_data_captcha_encode(char **paths, int n, int m, int w, int h)
     return d;
 }
 
+/*
+** labels是一个有序的类别标签
+** 每一类图片应存放在一个以其所属类别(即label)命名的文件夹类便于匹配
+** 每一张图片只允许其匹配一个label，否则跳出too many or too few labels的提示
+** truth对应labels的真值，符合则在对应的labels中的index将truth[index]置１
+*/
 void fill_truth(char *path, char **labels, int k, float *truth)
 {
     int i;
-    memset(truth, 0, k*sizeof(float));
+    memset(truth, 0, k*sizeof(float));	// 将truth中前k个float全部清零
     int count = 0;
     for(i = 0; i < k; ++i){
+	// 判断labels[i]是否是path的子串，若是则令truth[i]=1
         if(strstr(path, labels[i])){
             truth[i] = 1;
             ++count;
             //printf("%s %s %d\n", path, labels[i], i);
         }
     }
+    // 一张图片只能对应一个标签，否则都将会输出提示
     if(count != 1 && (k != 1 || count != 0)) printf("Too many or too few labels: %d, %s\n", count, path);
 }
 
@@ -619,6 +629,7 @@ matrix load_regression_labels_paths(char **paths, int n, int k)
     return y;
 }
 
+// 对n张图片进行labels的真值填充，即矩阵y的每一行标注该图片属于哪一类别
 matrix load_labels_paths(char **paths, int n, char **labels, int k, tree *hierarchy)
 {
     matrix y = make_matrix(n, k);
@@ -666,6 +677,11 @@ char **get_labels(char *filename)
     return labels;
 }
 
+/*
+** 浅层释放与深层释放，当shallow=1时浅层释放，否则深层释放
+** 深层释放时一行行释放d.X.vals和d.X.vals中的内存，再将指针vals释放
+** 浅层释放时，只释放指针vals，并不释放matrix X&y中的数据
+*/
 void free_data(data d)
 {
     if(!d.shallow){
@@ -1145,28 +1161,43 @@ pthread_t load_data_in_thread(load_args args)
     return thread;
 }
 
+/* 
+** 开辟多个线程读入图片数据，读入数据存储至ptr.d中，该函数是传指针
+** ptr包含所有线程要读入图片数据的信息（读入多少张，开几个线程读入，读入图片最终的宽高，图片路径等等）
+** 这里需注意out与ptr.d指向的是同一内存块，即使后面的args.d会发生变化，但是out是不变的
+** 流程：本函数首先会获取要读入图片的张数、要开启线程的个数，而后计算每个线程应该读入的图片张数（尽可能的均匀分配），
+** 并创建所有的线程，并行读入数据，最后合并每个线程读入的数据至一个大data中，这个data的指针变量与ptr的指针变量
+** 指向的是统一块内存，因此也就最终将数据读入到ptr.d中
+*/
 void *load_threads(void *ptr)
 {
     int i;
-    load_args args = *(load_args *)ptr;
-    if (args.threads == 0) args.threads = 1;
-    data *out = args.d;
-    int total = args.n;
-    free(ptr);
-    data *buffers = calloc(args.threads, sizeof(data));
-    pthread_t *threads = calloc(args.threads, sizeof(pthread_t));
+    load_args args = *(load_args *)ptr;		// ptr参数为void类型，传进的参数是load_args*类型，需强制转换
+    if (args.threads == 0) args.threads = 1;	// 若参数中为分配线程，则在这里将线程数设置为１
+    data *out = args.d;	// 使得out与args.d指向同一块内存，args.d变化即out变化 
+    int total = args.n;	// total表示一次加载的图片张数，即所有线程同时读取的图片数
+    free(ptr);		// 虽然args不是指针，但是将ptr所指内容copy过来时，args中内容多为指针，所以数据是一起变化的
+    data *buffers = calloc(args.threads, sizeof(data));		// 每一个线程都会读入一个data，定义并分配args.threads个data的内存
+    pthread_t *threads = calloc(args.threads, sizeof(pthread_t));	// 为每个线程动态分配内存
     for(i = 0; i < args.threads; ++i){
-        args.d = buffers + i;
+        // args.d指针变量发生变动，与out不再指向同一内存，转而指向buffers的一段内存，实际上想把数据存到buffers中
+	args.d = buffers + i;
+	// args.n计算方法比较巧妙，因为totla/args.threads可能出现小数从而导致取整，最后线程同时处理的图片数可能小于total
+	// 这种方法恰巧可以规避这种情况，从而使得每个线程分配的图片大致相等，同时总图片数恰巧等于total
         args.n = (i+1) * total/args.threads - i * total/args.threads;
-        threads[i] = load_data_in_thread(args);
+        // 开启线程，将数据加载到args.d中(由于buffers[i]与args.d指向同一内存，即将数据加载到buffers[i]中)
+	threads[i] = load_data_in_thread(args);
     }
+
+    // 以阻塞的方式等待线程threads[i]结束：阻塞是指阻塞启动该子线程的母线程（此处应为主线程）
     for(i = 0; i < args.threads; ++i){
         pthread_join(threads[i], 0);
     }
-    *out = concat_datas(buffers, args.threads);
-    out->shallow = 0;
+    // 在concat_datas函数中，矩阵的合并中是有给vals申请内存的，所以需浅层将vals指针释放，但不释放数据
+    *out = concat_datas(buffers, args.threads);	// 将buffers中的所有data合并成一个大data，存到args.d中
+    out->shallow = 0;				// 将out的shallow设为0(进行concat_datas处理后的shallow原本为1)
     for(i = 0; i < args.threads; ++i){
-        buffers[i].shallow = 1;
+        buffers[i].shallow = 1;			// 浅层释放所有buffers中的data，即只释放matrix中的vals指针
         free_data(buffers[i]);
     }
     free(buffers);
@@ -1181,11 +1212,19 @@ void load_data_blocking(load_args args)
     load_thread(ptr);
 }
 
+/*
+** 开辟线程，读入一次迭代所需的所有图片数据，返回线程id
+** 这里需注意args是按值传递的，不论怎样都不会对原来的args中的数值产生影响
+** 但是由于args中含有很多指针变量，这些指针指向的内存块是不会变的
+** 所以不论是在那个函数中，不要随意深层释放args.d中的数据
+*/
 pthread_t load_data(load_args args)
 {
     pthread_t thread;
     struct load_args *ptr = calloc(1, sizeof(struct load_args));
+    // 由于ptr申请了内存，所以此处将args深拷贝到args指向的一块内存中
     *ptr = args;
+    // 创建相应的线程，第二个参数是线程的属性，将其设置为空，load_threads是线程运行函数，ptr是load_threads的参数
     if(pthread_create(&thread, 0, load_threads, ptr)) error("Thread creation failed");
     return thread;
 }
@@ -1205,6 +1244,7 @@ data load_data_writing(char **paths, int n, int m, int w, int h, int out_w, int 
     return d;
 }
 
+// 在paths的前m个路径中随机选取n个，将其存入data中并返回
 data load_data_old(char **paths, int n, int m, char **labels, int k, int w, int h)
 {
     if(m) paths = get_random_paths(paths, n, m);
@@ -1367,6 +1407,7 @@ data load_data_tag(char **paths, int n, int m, int k, int min, int max, int size
     return d;
 }
 
+// 将两个矩阵上下合并在一起
 matrix concat_matrix(matrix m1, matrix m2)
 {
     int i, count = 0;
@@ -1383,6 +1424,7 @@ matrix concat_matrix(matrix m1, matrix m2)
     return m;
 }
 
+// 将d1和d2的X,y矩阵上下合并，新data的w,h与d1一致
 data concat_data(data d1, data d2)
 {
     data d = {0};
@@ -1394,6 +1436,7 @@ data concat_data(data d1, data d2)
     return d;
 }
 
+// 将n个data合并，d[0]的X,y矩阵在最下，类似于堆栈，新data的w,h与d[n-1]保持一致
 data concat_datas(data *d, int n)
 {
     int i;
@@ -1460,6 +1503,12 @@ void get_random_batch(data d, int n, float *X, float *y)
     }
 }
 
+/*
+** 该函数目的是将data中由矩阵形式存储的图片数据和真值转为数组X,y的线性存储
+** n表示net->batch
+** X表示net->input
+** y表示net->truth
+*/
 void get_next_batch(data d, int n, int offset, float *X, float *y)
 {
     int j;

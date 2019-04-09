@@ -1320,6 +1320,7 @@ image load_image_stb(char *filename, int channels)
     return im;
 }
 
+// 按照规定的w,h,c加载图片，若opencv或stb加载的图片与规定不符，则按照规定调整图像大小
 image load_image(char *filename, int w, int h, int c)
 {
 #ifdef OPENCV
@@ -1336,6 +1337,7 @@ image load_image(char *filename, int w, int h, int c)
     return out;
 }
 
+// 加载3channel(彩色)图片
 image load_image_color(char *filename, int w, int h)
 {
     return load_image(filename, w, h, 3);

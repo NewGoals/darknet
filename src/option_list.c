@@ -50,7 +50,7 @@ metadata get_metadata(char *file)
     return m;
 }
 
-// strip string s into key&value and then insert them into options
+// 将字符串s "=" 两边转化成键值对类型插入到options中
 int read_option(char *s, list *options)
 {
     size_t i;
@@ -69,8 +69,7 @@ int read_option(char *s, list *options)
     return 1;
 }
 
-// insert a node which sturct contains key&value into list
-// from this func we can see 'kvp->node->list'
+// 将键值对结构的节点插入到list l中
 void option_insert(list *l, char *key, char *val)
 {
     kvp *p = malloc(sizeof(kvp));
@@ -80,6 +79,7 @@ void option_insert(list *l, char *key, char *val)
     list_insert(l, p);
 }
 
+// 列出未使用的参数
 void option_unused(list *l)
 {
     node *n = l->front;
@@ -116,6 +116,7 @@ char *option_find_str(list *l, char *key, char *def)
     return def;
 }
 
+// 根据字符串key找到其对应的val，将其转化为整形返回，否则返回默认
 int option_find_int(list *l, char *key, int def)
 {
     char *v = option_find(l, key);

@@ -31,7 +31,10 @@
 #include "shortcut_layer.h"
 #include "parser.h"
 #include "data.h"
-
+/*
+** 根据神经网络(net)获取图片参数的基本信息
+** args.w和args.h均为net规定的宽和高
+*/
 load_args get_base_args(network *net)
 {
     load_args args = {0};
@@ -51,7 +54,7 @@ load_args get_base_args(network *net)
 }
 
 /*
-** 对网络(net)解析网络配置文件cfg，权重为weights
+** 对网络(net)解析网络配置文件cfg，并加载预训练权重weights
 ** net->seen 表示从训练器开始运行到当前时刻已经训练的图像张数. 最终保存模型时的迭代次数就是根据 net->seen 计算得到的.
 ** 如果使用之前已经训练过的模型做微调, 但又不想使用之前模型中保存下的 seen 变量值, 可以在训练命令行使用 “-clear” 参数
 */
@@ -183,6 +186,7 @@ char *get_layer_string(LAYER_TYPE a)
     return "none";
 }
 
+// 申请内存，初始化神经网络结构
 network *make_network(int n)
 {
     network *net = calloc(1, sizeof(network));
@@ -295,14 +299,18 @@ void backward_network(network *netp)
     }
 }
 
+/*
+** 获取一个batch前向反向传播计算一次后的网络cost值
+** 通过seen累加来判断是否完成一个batch_size图片的计算，从而更新网络参数
+*/
 float train_network_datum(network *net)
 {
-    *net->seen += net->batch;
-    net->train = 1;
+    *net->seen += net->batch;	// 更新目前已处理的图片数量
+    net->train = 1;		// 标记网络所处的训练状态，net->train=1表示处于训练阶段，0表示测试阶段
     forward_network(net);
     backward_network(net);
-    float error = *net->cost;
-    if(((*net->seen)/net->batch)%net->subdivisions == 0) update_network(net);
+    float error = *net->cost;	// 获取loss值
+    if(((*net->seen)/net->batch)%net->subdivisions == 0) update_network(net);	// 每训练一个batch_size就更新一次网络参数
     return error;
 }
 
@@ -320,17 +328,23 @@ float train_network_sgd(network *net, data d, int n)
     return (float)sum/(n*batch);
 }
 
+/*
+** 计算一张图片的平均损失
+** 网络配置文件中的batch实际上为batch_size，net->batch为将batch划分后网络能处理的batch大小
+** train_network中的data中缓存的图片数应为batch_size
+*/
 float train_network(network *net, data d)
 {
-    assert(d.X.rows % net->batch == 0);
-    int batch = net->batch;
-    int n = d.X.rows / batch;
+    assert(d.X.rows % net->batch == 0);	// 断言data中的图片张数必须是net->batch的整数倍，否则终止程序
+    int batch = net->batch;		
+    int n = d.X.rows / batch;		// data中的图片张数是net->batch的多少倍
 
     int i;
     float sum = 0;
     for(i = 0; i < n; ++i){
+	// 将data中的所有图片转为线性存储，net->input存图片数据，net->truth存真值表
         get_next_batch(d, batch, i*batch, net->input, net->truth);
-        float err = train_network_datum(net);
+        float err = train_network_datum(net);	// 计算一个batch的cost值
         sum += err;
     }
     return (float)sum/(n*batch);
@@ -706,6 +720,7 @@ float *network_accuracies(network *net, data d, int n)
     return acc;
 }
 
+// 返回最后一个type不为COST的网络层，一般来说是返回最后一层网络
 layer get_network_output_layer(network *net)
 {
     int i;

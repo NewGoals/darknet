@@ -7,6 +7,7 @@
 #include <assert.h>
 #include <math.h>
 
+// 一行一行释放matrix.vals中的内存，再将指针vals释放
 void free_matrix(matrix m)
 {
     int i;
@@ -88,6 +89,7 @@ matrix copy_matrix(matrix m)
     return c;
 }
 
+// 初始化矩阵
 matrix make_matrix(int rows, int cols)
 {
     int i;

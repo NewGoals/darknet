@@ -530,7 +530,12 @@ typedef struct matrix{
     float **vals;
 } matrix;
 
-
+/*
+** w,h表示图片的宽和高
+** matrix X的每一行存储一张图片数据
+** matrix y的每一行存储一张图片的类别(label)
+** shallow表示data释放内存时采用浅层释放还是深层释放
+*/
 typedef struct{
     int w, h;
     matrix X;
