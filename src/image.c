@@ -220,8 +220,13 @@ void draw_bbox(image a, box bbox, int w, float r, float g, float b)
     }
 }
 
-// 加载alphabet字符表，以image格式存储
-// 加载图片是用3channel，并且不改变大小
+/*
+** 加载data/labels中的所有标签图片。所谓标签图片就是仅含单个字符的小图片，组合在一起可得到完整的类别标签
+** data/labels含有8套美国标准ASCII码32～127号字符，每套间仅大小（尺寸）不同，以应对不同大小的图片
+** 返回：image** 二维数组，8行128列，但实际上只有8*96，因为前32行未存放图片。每行包括一套32号～127号的ASCII标准码字符标签图片
+** 注意：image** 实际有效值为后面的96列，前32列为0指针，之所以还要保留前32列，是保持秩序统一，便于之后的访问，
+**       访问时，直接将ASCII码转为整型值即可得到在image**中的索引号，利于查找定位
+*/
 image **load_alphabet()
 {
     int i, j;
@@ -427,6 +432,19 @@ void censor_image(image im, int dx, int dy, int w, int h)
     }
 }
 
+/*
+** 将source图片嵌入到dest中
+** @param dx,dy 列偏移量和行偏移量
+** 注意：如图所示
+*  ###############
+*  #             #
+*  #<-->######   #
+*  # dx #    #   #
+*  #    ######   #
+*  #      dy     #
+*  ###############
+** 该函数的主要目的还是将source图片嵌入到dest的中心，偏移量应该为差的一半
+*/
 void embed_image(image source, image dest, int dx, int dy)
 {
     int x,y,k;
@@ -811,14 +829,20 @@ void letterbox_image_into(image im, int w, int h, image boxed)
     free_image(resized);
 }
 
-
-// 使得im的宽高比和指定的宽高相同，并且为im宽高与指定的宽高比中较小的
-// resized为重新调整后的im的图像
-// 返回的为im 与 boxed合并后的图像
+/*
+** 按照神经网络能处理的图片大小来调整图片尺寸，分为缩放和嵌入两个步骤
+** @param im 输入图片
+** @param w,h 网络能处理图片的宽和高
+** 返回：神经网络能够处理的的标准尺寸的图片
+** 注意：在嵌入图片的过程中，将行偏移量和列偏移量设为差的一般，因此结果是将图片嵌入boxed的正中
+**       且行偏移量和列偏移量有一个必然为零
+*/
 image letterbox_image(image im, int w, int h)
 {
     int new_w = im.w;
     int new_h = im.h;
+    // 缩放后的图片的尺寸与原图成等比例关系，比例值为w/im.w与h/im.h的较小者
+    // 比例差距较小的边与标准的宽或高相同，另一边按比例缩放
     if (((float)w/im.w) < ((float)h/im.h)) {
         new_w = w;
         new_h = (im.h * w)/im.w;
@@ -827,8 +851,8 @@ image letterbox_image(image im, int w, int h)
         new_w = (im.w * h)/im.h;
     }
     image resized = resize_image(im, new_w, new_h);
-    image boxed = make_image(w, h, im.c);
-    fill_image(boxed, .5);
+    image boxed = make_image(w, h, im.c);	// 构造一个标准尺寸的框架来将图片嵌入
+    fill_image(boxed, .5);			// 初始化所有像素值为0.5
     //int i;
     //for(i = 0; i < boxed.w*boxed.h*boxed.c; ++i) boxed.data[i] = 0;
     embed_image(resized, boxed, (w-new_w)/2, (h-new_h)/2); 

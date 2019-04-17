@@ -110,6 +110,7 @@ int *random_index_order(int min, int max)
     return inds;
 }
 
+// 删除index位置的参数
 void del_arg(int argc, char **argv, int index)
 {
     int i;
@@ -117,6 +118,7 @@ void del_arg(int argc, char **argv, int index)
     argv[i] = 0;
 }
 
+// 检查是否存在参数arg，若存在，将其删除后返回１,否则返回0
 int find_arg(int argc, char* argv[], char *arg)
 {
     int i;
@@ -130,6 +132,7 @@ int find_arg(int argc, char* argv[], char *arg)
     return 0;
 }
 
+// 检查是否存在参数arg，若存在将其转化为整型后返回，否则返回默认值
 int find_int_arg(int argc, char **argv, char *arg, int def)
 {
     int i;
@@ -160,6 +163,10 @@ float find_float_arg(int argc, char **argv, char *arg, float def)
     return def;
 }
 
+/*
+** 该函数搜索完参数返回值后会将arg和值同时删除，所以该函数主要搜索临时参数
+** 搜索值为arg的参数，若存在，返回其值，否则返回默认值def
+*/
 char *find_char_arg(int argc, char **argv, char *arg, char *def)
 {
     int i;

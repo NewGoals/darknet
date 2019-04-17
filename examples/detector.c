@@ -596,7 +596,7 @@ void test_detector(char *datacfg, char *cfgfile, char *weightfile, char *filenam
 
     // 加载字符表
     image **alphabet = load_alphabet();
-    // 利用network结构体存储模型配置，并载入其训练得到的权重weightfile
+    // 解析网络配置文件并加载权重weightfile
     network *net = load_network(cfgfile, weightfile, 0);
     // 将batch设为1，表示一张张检测图片
     set_batch_network(net, 1);
@@ -616,17 +616,15 @@ void test_detector(char *datacfg, char *cfgfile, char *weightfile, char *filenam
             fflush(stdout);
             input = fgets(input, 256, stdin);
             if(!input) return;
-            strtok(input, "\n");
+            strtok(input, "\n");		// 去掉input中的换行符
         }
-	// 载入input位置的图片，即需要检测的图片
-        image im = load_image_color(input,0,0);
-	// 将im嵌入规定大小的box中，调整图片的大小
-        image sized = letterbox_image(im, net->w, net->h);
+        image im = load_image_color(input,0,0);			// 将input的路径下的图片加载到im
+        image sized = letterbox_image(im, net->w, net->h);	// 通过适当的缩放嵌入，将输入图片调整为网络能处理的尺寸
         //image sized = resize_image(im, net->w, net->h);
         //image sized2 = resize_max(im, net->w);
         //image sized = crop_image(sized2, -((net->w - sized2.w)/2), -((net->h - sized2.h)/2), net->w, net->h);
         //resize_network(net, sized.w, sized.h);
-        layer l = net->layers[net->n-1];
+        layer l = net->layers[net->n-1];	// l指向网络的最后一层
 
 
         float *X = sized.data;
@@ -638,8 +636,7 @@ void test_detector(char *datacfg, char *cfgfile, char *weightfile, char *filenam
         //printf("%d\n", nboxes);
         //if (nms) do_nms_obj(boxes, probs, l.w*l.h*l.n, l.classes, nms);
         if (nms) do_nms_sort(dets, nboxes, l.classes, nms);
-	// 画预测结果
-        draw_detections(im, dets, nboxes, thresh, names, alphabet, l.classes);
+        draw_detections(im, dets, nboxes, thresh, names, alphabet, l.classes);	// 画预测结果
         free_detections(dets, nboxes);
         if(outfile){
 	    // 保存标记了预测标签的图片，若未指定名称，则保存为predictions
@@ -843,6 +840,7 @@ void run_detector(int argc, char **argv)
     
     // 检查是否指定GPU运算，gpus_list表示所有列出的gpu，gpus应该用','隔开
     char *gpu_list = find_char_arg(argc, argv, "-gpus", 0);
+    // 检查是否指定输出文件路径
     char *outfile = find_char_arg(argc, argv, "-out", 0);
     int *gpus = 0;
     int gpu = 0;
@@ -877,7 +875,7 @@ void run_detector(int argc, char **argv)
 
     // 第四个参数应为数据配置文件，将其存入字符串datacfg，其存储位置在cfg中，以.data为后缀
     char *datacfg = argv[3];
-    // 第五个参数应为配置文件，即所选模型的配置，其存储位置在cfg中，以.cfg为后缀
+    // 第五个参数应为网络配置文件，即所选模型的配置，其存储位置在cfg中，以.cfg为后缀
     char *cfg = argv[4];
     // 若参数数量大于5，则第六个参数为权重weight，否则weight为null
     char *weights = (argc > 5) ? argv[5] : 0;

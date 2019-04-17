@@ -282,6 +282,7 @@ layer parse_softmax(list *options, size_params params)
     return l;
 }
 
+// 将字符串类型的mask转换成数组类型，并将num设为数组的长度
 int *parse_yolo_mask(char *a, int *num)
 {
     int *mask = 0;
@@ -310,7 +311,7 @@ layer parse_yolo(list *options, size_params params)
     int num = total;
 
     char *a = option_find_str(options, "mask", 0);
-    int *mask = parse_yolo_mask(a, &num);
+    int *mask = parse_yolo_mask(a, &num);		// 将mask转换为数组类型，并使得num等于数组的长度
     layer l = make_yolo_layer(params.batch, params.w, params.h, num, total, mask, classes);
     assert(l.outputs == params.inputs);
 
@@ -769,9 +770,9 @@ network *parse_network_cfg(char *filename)
     params.net = net;
 
     size_t workspace_size = 0;
-    n = n->next;	// n指向第一层神经网络
+    n = n->next;	// n指向第一层神经网络节点
     int count = 0;
-    free_section(s);
+    free_section(s);	// 将s的内容[net]释放掉，使其存储后面的神经网络层参数
     fprintf(stderr, "layer     filters    size              input                output\n");
     while(n){
         params.index = count;
@@ -855,7 +856,7 @@ network *parse_network_cfg(char *filename)
         l.learning_rate_scale = option_find_float_quiet(options, "learning_rate", 1);
         l.smooth = option_find_float_quiet(options, "smooth", 0);
         option_unused(options);		// 列出未使用的参数
-        net->layers[count] = l;		// 将该layer l作为net的第i层网络
+        net->layers[count] = l;		// 将该layer l作为net的第i层网络,因此最后一层应为net->layers[net->n-1]
         if (l.workspace_size > workspace_size) workspace_size = l.workspace_size;
         free_section(s);
         n = n->next;			// n指向下一层神经网络参数
@@ -871,7 +872,7 @@ network *parse_network_cfg(char *filename)
     free_list(sections);
     layer out = get_network_output_layer(net);	// 获取最后一层网络
     net->outputs = out.outputs;			//*outputs可能为label的数量，那么net->outputs代表可识别物体有多少种
-    net->truths = out.outputs;			//*若上述猜想正确，net->truth表示真值表长度
+    net->truths = out.outputs;			//*若上述猜想正确，net->truths表示真值表长度
     if(net->layers[net->n-1].truths) net->truths = net->layers[net->n-1].truths;
     net->output = out.output;			//*output为最后一层神经网络的输出的真值表，该输出同时也是网络的输入
     net->input = calloc(net->inputs*net->batch, sizeof(float));		// 为网络载入图片申请内存
@@ -904,7 +905,7 @@ list *read_cfg(char *filename)
     char *line;
     int nu = 0;
     list *options = make_list();
-    section *current = 0;	// 先另section指向null
+    section *current = 0;	// 先令section指向null
     while((line=fgetl(file)) != 0){
         ++ nu;
         strip(line);		// 去除句子句子的空格，\n,\t

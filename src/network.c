@@ -518,16 +518,17 @@ void top_predictions(network *net, int k, int *index)
 }
 
 
+// 利用网络的一次前向传播即可得到输出结果
 float *network_predict(network *net, float *input)
 {
-    network orig = *net;
+    network orig = *net;	// 将原网络拷贝给orig，防止网络数据被更改
     net->input = input;
     net->truth = 0;
     net->train = 0;
     net->delta = 0;
     forward_network(net);
     float *out = net->output;
-    *net = orig;
+    *net = orig;		// 恢复原网络
     return out;
 }
 

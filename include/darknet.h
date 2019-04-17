@@ -505,6 +505,7 @@ typedef struct {
     float aspect;
 } augment_args;
 
+// image的存储方式为逐层遍历c,h,w
 typedef struct {
     int w;
     int h;
